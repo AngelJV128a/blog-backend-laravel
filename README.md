@@ -42,7 +42,7 @@ Ideal como base para aplicaciones tipo red social, portafolios, o blogs personal
 1. Clona el repositorio:
 
 ```bash
-git clone https://github.com/tu_usuario/blog-backend.git
+git clone https://github.com/AngelJV128a/blog-backend-laravel
 cd blog-backend
 ```
 2. Instala las dependencias:
