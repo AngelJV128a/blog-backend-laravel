@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Like;
 use App\Models\Post;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
 /**
  * @OA\Schema(
@@ -136,47 +137,71 @@ class PostController extends Controller
     /**
      * @OA\Get(
      *     path="/api/posts/likes/{id_user}",
-     *     summary="Obtener posts a los que un usuario ha dado like",
-     *     description="Retorna una lista de likes del usuario especificado, incluyendo los datos del post relacionado.",
-     *     operationId="showPostsByLikes",
+     *     operationId="getLikedPosts",
      *     tags={"Posts"},
      *     security={{"bearerAuth":{}}},
+     *     summary="Obtener los posts que le gustaron a un usuario",
+     *     description="Devuelve los posts que han sido marcados como 'me gusta' por un usuario específico, incluyendo el número de likes y comentarios por publicación.",
      *     @OA\Parameter(
      *         name="id_user",
      *         in="path",
-     *         required=true,
      *         description="ID del usuario",
+     *         required=true,
      *         @OA\Schema(type="integer")
      *     ),
      *     @OA\Response(
      *         response=200,
-     *         description="Lista de likes con posts relacionados",
+     *         description="Lista de posts con conteos de likes y comentarios",
      *         @OA\JsonContent(
      *             type="array",
      *             @OA\Items(
-     *                 type="object",
      *                 @OA\Property(property="id", type="integer", example=1),
+     *                 @OA\Property(property="title", type="string", example="Título del post"),
+     *                 @OA\Property(property="content", type="string", example="Contenido del post"),
      *                 @OA\Property(property="user_id", type="integer", example=5),
-     *                 @OA\Property(property="post_id", type="integer", example=12),
-     *                 @OA\Property(
-     *                     property="post",
-     *                     type="object",
-     *                     @OA\Property(property="id", type="integer", example=12),
-     *                     @OA\Property(property="title", type="string", example="Título del post"),
-     *                     @OA\Property(property="content", type="string", example="Contenido del post")
-     *                 )
+     *                 @OA\Property(property="name", type="string", example="Juan Pérez"),
+     *                 @OA\Property(property="updated_at", type="string", format="date-time", example="2024-08-15T14:12:00Z"),
+     *                 @OA\Property(property="count_likes", type="integer", example=10),
+     *                 @OA\Property(property="count_comentarios", type="integer", example=3)
      *             )
      *         )
      *     ),
      *     @OA\Response(
      *         response=404,
-     *         description="Usuario no encontrado"
+     *         description="Usuario no encontrado o sin publicaciones"
+     *     ),
+     *     @OA\Response(
+     *         response=500,
+     *         description="Error interno del servidor"
      *     )
      * )
      */
     public function showPostsByLikes($id_user)
     {
-        $posts = Like::with(['post'])->where('user_id', $id_user)->get();
+        $posts = DB::table('posts')
+            ->select(
+                'posts.id',
+                'posts.title',
+                'posts.content',
+                'posts.user_id',
+                'users.name',
+                'posts.updated_at',
+                DB::raw('(SELECT COUNT(*) FROM likes WHERE likes.post_id = posts.id) as count_likes'),
+                DB::raw('(SELECT COUNT(*) FROM comments WHERE comments.post_id = posts.id) as count_comentarios')
+            )
+            ->join('likes', 'posts.id', '=', 'likes.post_id')
+            ->join('users', 'posts.user_id', '=', 'users.id')
+            ->where('likes.user_id', $id_user)
+            ->groupBy(
+                'posts.id',
+                'posts.title',
+                'posts.content',
+                'posts.user_id',
+                'users.name',
+                'posts.updated_at'
+            )
+            ->get();
+
         return response()->json($posts);
     }
 

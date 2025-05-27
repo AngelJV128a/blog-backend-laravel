@@ -167,6 +167,67 @@
                 ]
             }
         },
+        "/api/register": {
+            "post": {
+                "tags": [
+                    "Autenticación"
+                ],
+                "summary": "Registrar nuevo usuario",
+                "operationId": "8a56853624e025573120a09a4c75d468",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "required": [
+                                    "name",
+                                    "email",
+                                    "password"
+                                ],
+                                "properties": {
+                                    "name": {
+                                        "type": "string",
+                                        "example": "Juan Pérez"
+                                    },
+                                    "email": {
+                                        "type": "string",
+                                        "format": "email",
+                                        "example": "juan@example.com"
+                                    },
+                                    "password": {
+                                        "type": "string",
+                                        "format": "password",
+                                        "example": "secreto123"
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "Registro exitoso",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Registro exitoso"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Error de validación"
+                    }
+                }
+            }
+        },
         "/api/comments": {
             "get": {
                 "tags": [
@@ -794,9 +855,9 @@
                 "tags": [
                     "Posts"
                 ],
-                "summary": "Obtener posts a los que un usuario ha dado like",
-                "description": "Retorna una lista de likes del usuario especificado, incluyendo los datos del post relacionado.",
-                "operationId": "showPostsByLikes",
+                "summary": "Obtener los posts que le gustaron a un usuario",
+                "description": "Devuelve los posts que han sido marcados como 'me gusta' por un usuario específico, incluyendo el número de likes y comentarios por publicación.",
+                "operationId": "getLikedPosts",
                 "parameters": [
                     {
                         "name": "id_user",
@@ -810,7 +871,7 @@
                 ],
                 "responses": {
                     "200": {
-                        "description": "Lista de likes con posts relacionados",
+                        "description": "Lista de posts con conteos de likes y comentarios",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -821,30 +882,34 @@
                                                 "type": "integer",
                                                 "example": 1
                                             },
+                                            "title": {
+                                                "type": "string",
+                                                "example": "Título del post"
+                                            },
+                                            "content": {
+                                                "type": "string",
+                                                "example": "Contenido del post"
+                                            },
                                             "user_id": {
                                                 "type": "integer",
                                                 "example": 5
                                             },
-                                            "post_id": {
-                                                "type": "integer",
-                                                "example": 12
+                                            "name": {
+                                                "type": "string",
+                                                "example": "Juan Pérez"
                                             },
-                                            "post": {
-                                                "properties": {
-                                                    "id": {
-                                                        "type": "integer",
-                                                        "example": 12
-                                                    },
-                                                    "title": {
-                                                        "type": "string",
-                                                        "example": "Título del post"
-                                                    },
-                                                    "content": {
-                                                        "type": "string",
-                                                        "example": "Contenido del post"
-                                                    }
-                                                },
-                                                "type": "object"
+                                            "updated_at": {
+                                                "type": "string",
+                                                "format": "date-time",
+                                                "example": "2024-08-15T14:12:00Z"
+                                            },
+                                            "count_likes": {
+                                                "type": "integer",
+                                                "example": 10
+                                            },
+                                            "count_comentarios": {
+                                                "type": "integer",
+                                                "example": 3
                                             }
                                         },
                                         "type": "object"
@@ -854,7 +919,10 @@
                         }
                     },
                     "404": {
-                        "description": "Usuario no encontrado"
+                        "description": "Usuario no encontrado o sin publicaciones"
+                    },
+                    "500": {
+                        "description": "Error interno del servidor"
                     }
                 },
                 "security": [
