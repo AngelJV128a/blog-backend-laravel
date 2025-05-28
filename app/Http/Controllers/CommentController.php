@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Comment;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
 
 /**
  * @OA\Schema(
@@ -52,7 +53,9 @@ class CommentController extends Controller
      */
     public function index(Request $request)
     {
+        Log::info('Listando comentarios');
         $comments = Comment::where('post_id', $request->post_id)->get();
+        Log::info('Comentarios listados');
 
         return response()->json($comments);
     }
@@ -82,11 +85,20 @@ class CommentController extends Controller
      */
     public function store(Request $request)
     {
+        Log::info('Validando datos');
+        $request->validate([
+            'post_id' => 'required|integer',
+            'user_id' => 'required|integer',
+            'content' => 'required|string|max:10000'
+        ]);
+
+        Log::info('Creando comentario');
         $comment = new Comment();
         $comment->post_id = $request->post_id;
         $comment->user_id = $request->user_id;
         $comment->content = $request->content;
         $comment->save();
+        Log::info('Comentario creado');
 
         return response()->json($comment);
     }
@@ -121,9 +133,14 @@ class CommentController extends Controller
      */
     public function update(Request $request, $id)
     {
+        $request->validate([
+            'content' => 'required|string|max:10000'
+        ]);
+        Log::info('Actualizando comentario');
         $comment = Comment::find($id);
         $comment->content = $request->content;
         $comment->save();
+        Log::info('Comentario actualizado');
 
         return response()->json($comment);
     }
@@ -151,8 +168,10 @@ class CommentController extends Controller
      */
     public function destroy($id)
     {
+        Log::info('Eliminando comentario');
         $comment = Comment::find($id);
         $comment->delete();
+        Log::info('Comentario eliminado');
 
         return response()->json($comment);
     }

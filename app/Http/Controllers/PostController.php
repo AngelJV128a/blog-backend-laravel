@@ -6,6 +6,7 @@ use App\Models\Like;
 use App\Models\Post;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 
 /**
  * @OA\Schema(
@@ -74,9 +75,13 @@ class PostController extends Controller
 
     public function index()
     {
+        Log::info('Listando posts para el usuario:');
+
         $posts = Post::with(['user'])
             ->withCount(['likes', 'comments'])
             ->paginate(10);
+
+        Log::info('Posts listados');
         return response()->json($posts);
     }
 
@@ -109,8 +114,14 @@ class PostController extends Controller
      */
     public function show($id)
     {
+        Log::info('Mostrando post con ID: ' . $id);
         $post = Post::with(['user'])->withCount(['likes'])->find($id);
 
+        if(!$post) {
+            Log::info('Post no encontrado');
+            return response()->json(['message' => 'Post no encontrado'], 404);
+        }
+        Log::info('Post encontrado');
         return response()->json($post);
     }
 
@@ -165,6 +176,7 @@ class PostController extends Controller
      */
     public function showPostsByUser($id_user)
     {
+        Log::info('Mostrando posts de un usuario');
         $posts = Post::with(['user'])
             ->where('user_id', $id_user)
             ->paginate(10);
@@ -222,6 +234,7 @@ class PostController extends Controller
      */
     public function showPostsByLikes($id_user)
     {
+        Log::info('Mostrando posts con likes de un usuario');
         $posts = DB::table('posts')
             ->select(
                 'posts.id',
@@ -279,13 +292,20 @@ class PostController extends Controller
      */
     public function store(Request $request)
     {
+        Log::info('Validando datos');
+        $request->validate([
+            'title' => 'required|string|max:255',
+            'content' => 'required|string|max:10000'
+        ]);
+
+        Log::info('Creando post');
         $post = new Post();
         $post->title = $request->title;
         $post->content = $request->content;
         $post->user_id = auth()->user()->id;
 
         $post->save();
-
+        Log::info('Post creado');
         return response()->json($post);
     }
 
@@ -327,6 +347,11 @@ class PostController extends Controller
      */
     public function update(Request $request, $id)
     {
+        $request->validate([
+            'title' => 'required|string|max:255',
+            'content' => 'required|string|max:10000',
+        ]);
+
         $post = Post::find($id);
         $post->title = $request->title;
         $post->content = $request->content;
