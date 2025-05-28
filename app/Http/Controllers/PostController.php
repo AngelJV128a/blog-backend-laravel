@@ -36,19 +36,47 @@ class PostController extends Controller
      *     summary="Obtener lista de posts con su cantidad de likes y comentarios",
      *     tags={"Posts"},
      *     security={{"bearerAuth":{}}},
+     *
+     *     @OA\Parameter(
+     *         name="page",
+     *         in="query",
+     *         description="Número de página",
+     *         required=false,
+     *         @OA\Schema(type="integer", default=1)
+     *     ),
+     *     @OA\Parameter(
+     *         name="per_page",
+     *         in="query",
+     *         description="Cantidad de elementos por página",
+     *         required=false,
+     *         @OA\Schema(type="integer", default=10)
+     *     ),
+     *
      *     @OA\Response(
      *         response=200,
-     *         description="Lista de posts"
+     *         description="Lista de posts paginados",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="current_page", type="integer"),
+     *             @OA\Property(property="data", type="array", @OA\Items(ref="#/components/schemas/Post")),
+     *             @OA\Property(property="last_page", type="integer"),
+     *             @OA\Property(property="total", type="integer"),
+     *             @OA\Property(property="per_page", type="integer")
+     *         )
      *     ),
+     *
      *     @OA\Response(
      *         response=401,
      *         description="No autorizado"
      *     )
      * )
      */
+
+
     public function index()
     {
-        $posts = Post::with(['user'])->withCount(['likes', 'comments'])->get();
+        $posts = Post::with(['user'])
+            ->withCount(['likes', 'comments'])
+            ->paginate(10);
         return response()->json($posts);
     }
 
@@ -101,6 +129,13 @@ class PostController extends Controller
      *         description="ID del usuario",
      *         @OA\Schema(type="integer")
      *     ),
+     *     @OA\Parameter(
+     *         name="page",
+     *         in="query",
+     *         description="Número de página",
+     *         required=false,
+     *         @OA\Schema(type="integer", default=1)
+     *     ),
      *     @OA\Response(
      *         response=200,
      *         description="Lista de posts con datos del usuario",
@@ -130,7 +165,9 @@ class PostController extends Controller
      */
     public function showPostsByUser($id_user)
     {
-        $posts = Post::with(['user'])->where('user_id', $id_user)->get();
+        $posts = Post::with(['user'])
+            ->where('user_id', $id_user)
+            ->paginate(10);
         return response()->json($posts);
     }
 
@@ -148,6 +185,13 @@ class PostController extends Controller
      *         description="ID del usuario",
      *         required=true,
      *         @OA\Schema(type="integer")
+     *     ),
+     *     @OA\Parameter(
+     *         name="page",
+     *         in="query",
+     *         description="Número de página",
+     *         required=false,
+     *         @OA\Schema(type="integer", default=1)
      *     ),
      *     @OA\Response(
      *         response=200,
@@ -200,7 +244,7 @@ class PostController extends Controller
                 'users.name',
                 'posts.updated_at'
             )
-            ->get();
+            ->paginate(10); // 👈 Pagina los resultados
 
         return response()->json($posts);
     }
