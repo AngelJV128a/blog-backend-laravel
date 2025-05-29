@@ -34,6 +34,7 @@ Route::group([
     Route::post('logout', [AuthController::class, 'logout']);
     Route::post('refresh', [AuthController::class, 'refresh']);
     Route::get('me', [AuthController::class, 'me']);
+    Route::post('register', [AuthController::class, 'register']);
 });
 
 Route::get('/posts', [PostController::class, 'index']);
@@ -41,6 +42,8 @@ Route::get('/posts/{post}', [PostController::class, 'show']);
 Route::post('/posts', [PostController::class, 'store']);
 Route::put('/posts/{post}', [PostController::class, 'update']);
 Route::delete('/posts/{post}', [PostController::class, 'destroy']);
+Route::get('/posts/user/{user}', [PostController::class, 'showPostsByUser']);
+Route::get('/posts/likes/{user}', [PostController::class, 'showPostsByLikes']);
 
 Route::post('/likes', [LikesController::class, 'giveLike']);
 Route::delete('/likes', [LikesController::class, 'deleteLike']);

@@ -6,6 +6,7 @@ use App\Models\Like;
 use App\Models\Post;
 use App\Models\User;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
 
 /**
  * @OA\Schema(
@@ -56,13 +57,16 @@ class LikesController extends Controller
      */
     public function giveLike(Request $request)
     {
+        Log::info('Dar like a un post');
         $post = Post::find($request->post_id);
         $user = User::find($request->user_id);
 
+        Log::info('Post encontrado');
         $like = new Like();
         $like->post_id = $post->id;
         $like->user_id = $user->id;
         $like->save();
+        Log::info('Like registrado');
 
         return response()->json($like);
     }
@@ -94,8 +98,10 @@ class LikesController extends Controller
      */
     public function deleteLike(Request $request)
     {
+        Log::info('Eliminar like de un post');
         $like = Like::where('post_id', $request->post_id)->where('user_id', $request->user_id)->first();
         $like->delete();
+        Log::info('Like eliminado');
 
         return response()->json($like);
     }
@@ -129,8 +135,10 @@ class LikesController extends Controller
      */
     public function showLikes(Request $request, $post_id)
     {
+        Log::info('Mostrando likes de un post');
         $likesCount = Like::where('post_id', $post_id)->count();
 
+        Log::info('Likes obtenidos');
         return response()->json([
             'post_id' => $post_id,
             'likes' => $likesCount

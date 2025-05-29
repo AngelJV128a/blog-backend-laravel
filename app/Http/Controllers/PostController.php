@@ -2,8 +2,11 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Like;
 use App\Models\Post;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 
 /**
  * @OA\Schema(
@@ -34,19 +37,59 @@ class PostController extends Controller
      *     summary="Obtener lista de posts con su cantidad de likes y comentarios",
      *     tags={"Posts"},
      *     security={{"bearerAuth":{}}},
+     *
+     *     @OA\Parameter(
+     *         name="page",
+     *         in="query",
+     *         description="Número de página",
+     *         required=false,
+     *         @OA\Schema(type="integer", default=1)
+     *     ),
+     *     @OA\Parameter(
+     *         name="per_page",
+     *         in="query",
+     *         description="Cantidad de elementos por página",
+     *         required=false,
+     *         @OA\Schema(type="integer", default=10)
+     *     ),
+     *
      *     @OA\Response(
      *         response=200,
-     *         description="Lista de posts"
+     *         description="Lista de posts paginados",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="current_page", type="integer"),
+     *             @OA\Property(property="data", type="array", @OA\Items(ref="#/components/schemas/Post")),
+     *             @OA\Property(property="last_page", type="integer"),
+     *             @OA\Property(property="total", type="integer"),
+     *             @OA\Property(property="per_page", type="integer")
+     *         )
      *     ),
+     *
      *     @OA\Response(
      *         response=401,
      *         description="No autorizado"
      *     )
      * )
      */
+
+
     public function index()
     {
-        $posts = Post::withCount(['likes', 'comments'])->get();
+        $loggedUserId = auth()->id();
+
+        $posts = Post::with(['user'])
+            ->withCount(['likes', 'comments'])
+            ->with(['likes' => function ($query) use ($loggedUserId) {
+                $query->where('user_id', $loggedUserId);
+            }])
+            ->paginate(10);
+
+        // Transformar la colección para agregar el campo 'liked'
+        $posts->getCollection()->transform(function ($post) {
+            $post->liked = $post->likes->isNotEmpty();
+            unset($post->likes); // opcional: no enviar la lista de likes
+            return $post;
+        });
 
         return response()->json($posts);
     }
@@ -80,9 +123,174 @@ class PostController extends Controller
      */
     public function show($id)
     {
-        $post = Post::find($id);
+        Log::info('Mostrando post con ID: ' . $id);
+        $post = Post::with(['user'])->withCount(['likes'])->find($id);
 
+        if (!$post) {
+            Log::info('Post no encontrado');
+            return response()->json(['message' => 'Post no encontrado'], 404);
+        }
+        Log::info('Post encontrado');
         return response()->json($post);
+    }
+
+    /**
+     * @OA\Get(
+     *     path="/api/posts/user/{id_user}",
+     *     summary="Obtener posts de un usuario",
+     *     description="Retorna todos los posts creados por un usuario específico, incluyendo los datos del autor.",
+     *     operationId="showPostsByUser",
+     *     tags={"Posts"},
+     *     security={{"bearerAuth":{}}},
+     *     @OA\Parameter(
+     *         name="id_user",
+     *         in="path",
+     *         required=true,
+     *         description="ID del usuario",
+     *         @OA\Schema(type="integer")
+     *     ),
+     *     @OA\Parameter(
+     *         name="page",
+     *         in="query",
+     *         description="Número de página",
+     *         required=false,
+     *         @OA\Schema(type="integer", default=1)
+     *     ),
+     *     @OA\Response(
+     *         response=200,
+     *         description="Lista de posts con datos del usuario",
+     *         @OA\JsonContent(
+     *             type="array",
+     *             @OA\Items(
+     *                 type="object",
+     *                 @OA\Property(property="id", type="integer", example=10),
+     *                 @OA\Property(property="title", type="string", example="Mi primer post"),
+     *                 @OA\Property(property="content", type="string", example="Contenido del post..."),
+     *                 @OA\Property(property="user_id", type="integer", example=3),
+     *                 @OA\Property(
+     *                     property="user",
+     *                     type="object",
+     *                     @OA\Property(property="id", type="integer", example=3),
+     *                     @OA\Property(property="name", type="string", example="Juan Pérez"),
+     *                     @OA\Property(property="email", type="string", example="juan@example.com")
+     *                 )
+     *             )
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=404,
+     *         description="Usuario no encontrado"
+     *     )
+     * )
+     */
+    public function showPostsByUser($id_user)
+    {
+        Log::info('Mostrando posts de un usuario');
+
+        $loggedUserId = auth()->id();
+
+        $posts = Post::with(['user'])
+            ->withCount(['likes', 'comments'])
+            ->with(['likes' => function ($query) use ($loggedUserId) {
+                $query->where('user_id', $loggedUserId);
+            }])
+            ->where('user_id', $id_user)
+            ->paginate(10);
+
+        // Agregar el campo 'liked' a cada post
+        $posts->getCollection()->transform(function ($post) {
+            $post->liked = $post->likes->isNotEmpty();
+            unset($post->likes); // opcional
+            return $post;
+        });
+
+        return response()->json($posts);
+    }
+
+    /**
+     * @OA\Get(
+     *     path="/api/posts/likes/{id_user}",
+     *     operationId="getLikedPosts",
+     *     tags={"Posts"},
+     *     security={{"bearerAuth":{}}},
+     *     summary="Obtener los posts que le gustaron a un usuario",
+     *     description="Devuelve los posts que han sido marcados como 'me gusta' por un usuario específico, incluyendo el número de likes y comentarios por publicación.",
+     *     @OA\Parameter(
+     *         name="id_user",
+     *         in="path",
+     *         description="ID del usuario",
+     *         required=true,
+     *         @OA\Schema(type="integer")
+     *     ),
+     *     @OA\Parameter(
+     *         name="page",
+     *         in="query",
+     *         description="Número de página",
+     *         required=false,
+     *         @OA\Schema(type="integer", default=1)
+     *     ),
+     *     @OA\Response(
+     *         response=200,
+     *         description="Lista de posts con conteos de likes y comentarios",
+     *         @OA\JsonContent(
+     *             type="array",
+     *             @OA\Items(
+     *                 @OA\Property(property="id", type="integer", example=1),
+     *                 @OA\Property(property="title", type="string", example="Título del post"),
+     *                 @OA\Property(property="content", type="string", example="Contenido del post"),
+     *                 @OA\Property(property="user_id", type="integer", example=5),
+     *                 @OA\Property(property="name", type="string", example="Juan Pérez"),
+     *                 @OA\Property(property="updated_at", type="string", format="date-time", example="2024-08-15T14:12:00Z"),
+     *                 @OA\Property(property="count_likes", type="integer", example=10),
+     *                 @OA\Property(property="count_comentarios", type="integer", example=3)
+     *             )
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=404,
+     *         description="Usuario no encontrado o sin publicaciones"
+     *     ),
+     *     @OA\Response(
+     *         response=500,
+     *         description="Error interno del servidor"
+     *     )
+     * )
+     */
+    public function showPostsByLikes($id_user)
+    {
+        Log::info('Mostrando posts con likes de un usuario');
+        $posts = DB::table('posts')
+            ->select(
+                'posts.id',
+                'posts.title',
+                'posts.content',
+                'posts.user_id',
+                'users.name',
+                'posts.updated_at',
+                DB::raw('(SELECT COUNT(*) FROM likes WHERE likes.post_id = posts.id) as count_likes'),
+                DB::raw('(SELECT COUNT(*) FROM comments WHERE comments.post_id = posts.id) as count_comentarios')
+            )
+            ->join('likes', 'posts.id', '=', 'likes.post_id')
+            ->join('users', 'posts.user_id', '=', 'users.id')
+            ->where('likes.user_id', $id_user)
+            ->groupBy(
+                'posts.id',
+                'posts.title',
+                'posts.content',
+                'posts.user_id',
+                'users.name',
+                'posts.updated_at'
+            )
+            ->paginate(10); // 👈 Pagina los resultados
+
+        // Agregar 'liked' = true a cada resultado
+        $posts->getCollection()->transform(function ($post) {
+            $post->liked = true;
+            return $post;
+        });
+
+
+        return response()->json($posts);
     }
 
     /**
@@ -115,13 +323,20 @@ class PostController extends Controller
      */
     public function store(Request $request)
     {
+        Log::info('Validando datos');
+        $request->validate([
+            'title' => 'required|string|max:255',
+            'content' => 'required|string|max:10000'
+        ]);
+
+        Log::info('Creando post');
         $post = new Post();
         $post->title = $request->title;
         $post->content = $request->content;
         $post->user_id = auth()->user()->id;
 
         $post->save();
-
+        Log::info('Post creado');
         return response()->json($post);
     }
 
@@ -163,6 +378,11 @@ class PostController extends Controller
      */
     public function update(Request $request, $id)
     {
+        $request->validate([
+            'title' => 'required|string|max:255',
+            'content' => 'required|string|max:10000',
+        ]);
+
         $post = Post::find($id);
         $post->title = $request->title;
         $post->content = $request->content;
