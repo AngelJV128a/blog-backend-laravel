@@ -75,13 +75,22 @@ class PostController extends Controller
 
     public function index()
     {
-        Log::info('Listando posts para el usuario:');
+        $loggedUserId = auth()->id();
 
         $posts = Post::with(['user'])
             ->withCount(['likes', 'comments'])
+            ->with(['likes' => function ($query) use ($loggedUserId) {
+                $query->where('user_id', $loggedUserId);
+            }])
             ->paginate(10);
 
-        Log::info('Posts listados');
+        // Transformar la colección para agregar el campo 'liked'
+        $posts->getCollection()->transform(function ($post) {
+            $post->liked = $post->likes->isNotEmpty();
+            unset($post->likes); // opcional: no enviar la lista de likes
+            return $post;
+        });
+
         return response()->json($posts);
     }
 
@@ -117,7 +126,7 @@ class PostController extends Controller
         Log::info('Mostrando post con ID: ' . $id);
         $post = Post::with(['user'])->withCount(['likes'])->find($id);
 
-        if(!$post) {
+        if (!$post) {
             Log::info('Post no encontrado');
             return response()->json(['message' => 'Post no encontrado'], 404);
         }
@@ -177,9 +186,24 @@ class PostController extends Controller
     public function showPostsByUser($id_user)
     {
         Log::info('Mostrando posts de un usuario');
+
+        $loggedUserId = auth()->id();
+
         $posts = Post::with(['user'])
+            ->withCount(['likes', 'comments'])
+            ->with(['likes' => function ($query) use ($loggedUserId) {
+                $query->where('user_id', $loggedUserId);
+            }])
             ->where('user_id', $id_user)
             ->paginate(10);
+
+        // Agregar el campo 'liked' a cada post
+        $posts->getCollection()->transform(function ($post) {
+            $post->liked = $post->likes->isNotEmpty();
+            unset($post->likes); // opcional
+            return $post;
+        });
+
         return response()->json($posts);
     }
 
@@ -258,6 +282,13 @@ class PostController extends Controller
                 'posts.updated_at'
             )
             ->paginate(10); // 👈 Pagina los resultados
+
+        // Agregar 'liked' = true a cada resultado
+        $posts->getCollection()->transform(function ($post) {
+            $post->liked = true;
+            return $post;
+        });
+
 
         return response()->json($posts);
     }
