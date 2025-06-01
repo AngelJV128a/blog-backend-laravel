@@ -54,7 +54,7 @@ class CommentController extends Controller
     public function index(Request $request)
     {
         Log::info('Listando comentarios');
-        $comments = Comment::where('post_id', $request->post_id)->get();
+        $comments = Comment::with(['user'])->where('post_id', $request->post_id)->get();
         Log::info('Comentarios listados');
 
         return response()->json($comments);
